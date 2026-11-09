@@ -3,7 +3,7 @@
 -- Target: MySQL 8.0.16+; check your installed engine with SELECT VERSION();
 -- Run once in a new/empty societycare database. This script does not drop data.
 -- Includes 18 tables, 30 foreign keys, constraints, 7 additional indexes,
--- and the three initial user roles. It does not insert personal/sample data.
+-- and a fictional Dhaka society dataset with rows in every table.
 -- Cross-row workflow rules (role permissions, duplicate-link consistency,
 -- estimate approval before spending, original-reporter verification,
 -- and valid status transitions) require the PHP service layer or the
@@ -256,6 +256,94 @@ CREATE INDEX idx_assignment_queue ON Assignment(worker_id, ended_at, due_at);
 CREATE INDEX idx_assignment_due ON Assignment(ended_at, due_at);
 CREATE INDEX idx_comment_thread ON Comment(issue_id, posted_at);
 CREATE INDEX idx_notification_unread ON Notification(recipient_id, read_at, created_at);
+
+-- Fictional demo data for Lakeview Housing Society, Dhanmondi, Dhaka.
+-- All names and phone numbers are placeholders. Every account uses the demo
+-- password Demo@12345; replace these credentials before any real deployment.
+-- Run this script only against a new/empty societycare database.
+START TRANSACTION;
+
+INSERT INTO `Account` (`user_id`, `full_name`, `phone`, `password_hash`, `house_flat`, `created_at`) VALUES
+(1, 'Amina Rahman', '01000000001', '$2b$10$.p3xyDz8QZIrd5gt6CqFTOyTp7/w9NZ1Oc1mA8oOQ13E1v3/fmtGa', 'A-302', '2026-10-20 10:00:00'),
+(2, 'Farhan Karim', '01000000002', '$2b$10$.p3xyDz8QZIrd5gt6CqFTOyTp7/w9NZ1Oc1mA8oOQ13E1v3/fmtGa', 'B-204', '2026-10-21 11:00:00'),
+(3, 'Nusrat Jahan', '01000000003', '$2b$10$.p3xyDz8QZIrd5gt6CqFTOyTp7/w9NZ1Oc1mA8oOQ13E1v3/fmtGa', 'A-101', '2026-10-18 09:00:00'),
+(4, 'Rafiq Hasan', '01000000004', '$2b$10$.p3xyDz8QZIrd5gt6CqFTOyTp7/w9NZ1Oc1mA8oOQ13E1v3/fmtGa', NULL, '2026-10-22 09:00:00'),
+(5, 'Salma Akter', '01000000005', '$2b$10$.p3xyDz8QZIrd5gt6CqFTOyTp7/w9NZ1Oc1mA8oOQ13E1v3/fmtGa', NULL, '2026-10-22 09:30:00');
+
+INSERT INTO `AccountRole` (`user_id`, `role_code`, `granted_at`) VALUES
+(1, 'RESIDENT', '2026-10-20 10:00:00'),
+(2, 'RESIDENT', '2026-10-21 11:00:00'),
+(3, 'RESIDENT', '2026-10-18 09:00:00'),
+(3, 'COMMITTEE', '2026-10-18 09:00:00'),
+(4, 'WORKER', '2026-10-22 09:00:00'),
+(5, 'WORKER', '2026-10-22 09:30:00');
+
+INSERT INTO `Location` (`location_id`, `block_name`, `road_name`, `landmark`) VALUES
+(1, 'Block A', 'Road 7, Dhanmondi, Dhaka', 'Ground-floor water pump room'),
+(2, 'Block B', 'Road 8, Dhanmondi, Dhaka', 'Main entrance gate');
+
+INSERT INTO `Category` (`category_id`, `category_name`, `description`) VALUES
+(1, 'Plumbing', 'Water supply and drainage repairs'),
+(2, 'Electrical', 'Lighting and electrical maintenance');
+
+INSERT INTO `Issue` (`issue_id`, `tracking_no`, `title`, `description`, `reporter_id`, `location_id`, `category_id`, `priority`, `created_at`, `duplicate_of_id`, `duplicate_linked_by`, `duplicate_linked_at`) VALUES
+(1, 'SC-2026-001', 'Water leak beside pump room', 'Water is leaking from a pipe beside the Block A pump room.', 1, 1, 1, 'HIGH', '2026-11-01 08:30:00', NULL, NULL, NULL),
+(2, 'SC-2026-002', 'Entrance light is out', 'The Block B entrance light is not working after dark.', 2, 2, 2, 'HIGH', '2026-11-03 19:15:00', NULL, NULL, NULL),
+(3, 'SC-2026-003', 'Dark entrance at Block B', 'The main gate light is still off.', 1, 2, 2, 'MEDIUM', '2026-11-04 12:00:00', 2, 3, '2026-11-04 14:00:00');
+
+INSERT INTO `IssueSupport` (`issue_id`, `resident_id`, `supported_at`) VALUES
+(1, 2, '2026-11-01 10:00:00'),
+(2, 1, '2026-11-04 08:00:00');
+
+INSERT INTO `Assignment` (`assignment_id`, `issue_id`, `worker_id`, `assigned_by`, `assigned_at`, `due_at`, `ended_at`) VALUES
+(1, 1, 4, 3, '2026-11-02 09:00:00', '2026-11-05 18:00:00', '2026-11-04 18:00:00'),
+(2, 2, 5, 3, '2026-11-04 09:00:00', '2026-11-08 18:00:00', NULL);
+
+INSERT INTO `ProgressUpdate` (`update_id`, `issue_id`, `updated_by`, `status_code`, `note`, `created_at`) VALUES
+(1, 1, 1, 'OPEN', 'Leak reported by resident.', '2026-11-01 08:30:00'),
+(2, 1, 3, 'ASSIGNED', 'Plumber assigned.', '2026-11-02 09:00:00'),
+(3, 1, 4, 'IN_PROGRESS', 'Replacement pipe section identified.', '2026-11-03 10:00:00'),
+(4, 1, 4, 'AWAITING_VERIFICATION', 'Pipe replaced and leak checked.', '2026-11-04 18:00:00'),
+(5, 1, 3, 'CLOSED', 'Reporter accepted the repair.', '2026-11-05 10:00:00'),
+(6, 2, 2, 'OPEN', 'Entrance light reported.', '2026-11-03 19:15:00'),
+(7, 2, 3, 'ASSIGNED', 'Electrician assigned.', '2026-11-04 09:00:00'),
+(8, 2, 5, 'IN_PROGRESS', 'Replacement fixture requested.', '2026-11-05 11:00:00'),
+(9, 3, 1, 'OPEN', 'Second report of entrance light.', '2026-11-04 12:00:00'),
+(10, 3, 3, 'DUPLICATE', 'Linked to SC-2026-002.', '2026-11-04 14:00:00');
+
+INSERT INTO `ResolutionReview` (`review_id`, `completion_update_id`, `reporter_id`, `decision`, `reason`, `reviewed_at`) VALUES
+(1, 4, 1, 'ACCEPT', 'No further leakage seen.', '2026-11-05 09:30:00');
+
+INSERT INTO `DeadlineChange` (`change_id`, `assignment_id`, `changed_by`, `old_due_at`, `new_due_at`, `reason`, `changed_at`) VALUES
+(1, 2, 3, '2026-11-07 18:00:00', '2026-11-08 18:00:00', 'Replacement fixture delivery was delayed.', '2026-11-06 10:00:00');
+
+INSERT INTO `Escalation` (`escalation_id`, `assignment_id`, `due_at_snapshot`, `raised_at`, `note`) VALUES
+(1, 2, '2026-11-08 18:00:00', '2026-11-09 09:00:00', 'Entrance remains dark after the extended deadline.');
+
+INSERT INTO `Comment` (`comment_id`, `issue_id`, `author_id`, `body`, `posted_at`) VALUES
+(1, 1, 2, 'The water has reached the corridor near the pump room.', '2026-11-01 10:05:00'),
+(2, 2, 1, 'Please check this before the evening rush.', '2026-11-04 08:05:00');
+
+INSERT INTO `Notification` (`notification_id`, `recipient_id`, `issue_id`, `message`, `created_at`, `read_at`) VALUES
+(1, 4, 1, 'You have been assigned issue SC-2026-001.', '2026-11-02 09:01:00', '2026-11-02 09:15:00'),
+(2, 2, 2, 'Issue SC-2026-002 is in progress.', '2026-11-05 11:01:00', NULL),
+(3, 3, 2, 'Issue SC-2026-002 has passed its extended deadline.', '2026-11-09 09:01:00', NULL);
+
+INSERT INTO `RepairEstimate` (`estimate_id`, `issue_id`, `submitted_by`, `purpose`, `submitted_at`) VALUES
+(1, 1, 4, 'Replace the leaking pump-room pipe section', '2026-11-02 16:00:00');
+
+INSERT INTO `EstimateLine` (`estimate_id`, `line_no`, `description`, `quantity`, `unit_cost`) VALUES
+(1, 1, 'PVC pipe section (metres)', 2.00, 450.00),
+(1, 2, 'Pipe fittings (pieces)', 2.00, 175.00),
+(1, 3, 'Repair labour (job)', 1.00, 800.00);
+
+INSERT INTO `EstimateDecision` (`estimate_id`, `reviewed_by`, `outcome`, `reason`, `decided_at`) VALUES
+(1, 3, 'APPROVED', NULL, '2026-11-03 09:00:00');
+
+INSERT INTO `ActualExpense` (`expense_id`, `estimate_id`, `recorded_by`, `description`, `amount`, `spent_on`, `recorded_at`) VALUES
+(1, 1, 4, 'Pipe, fittings, and repair labour', 2050.00, '2026-11-04', '2026-11-04 16:00:00');
+
+COMMIT;
 
 -- Confirm creation: 18 base tables should appear.
 SHOW TABLES;
